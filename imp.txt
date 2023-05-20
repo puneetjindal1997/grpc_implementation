@@ -1,0 +1,12 @@
+For ubuntu
+
+.proto file
+
+1. sudo apt install -y protobuf-compiler
+2. protoc --version
+
+Mac use brew
+
+
+
+protoc --go-grpc_out=. --go_out=. *.proto

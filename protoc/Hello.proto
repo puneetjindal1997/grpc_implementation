@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+option go_package = "./"; // kaha auto generate code aiyega
+
+message HelloRequest {
+    string SomeString = 1;
+}
+
+message HelloResponse {
+    string Reply=1;
+}
+
+service Example {
+    rpc ServerReply (HelloRequest) returns (HelloResponse);
+}
