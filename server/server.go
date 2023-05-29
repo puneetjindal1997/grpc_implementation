@@ -7,9 +7,8 @@ package main
 import (
 	"fmt"
 	proto "grpc/protoc"
-	"io"
 	"net"
-	"strconv"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -20,7 +19,6 @@ type server struct {
 }
 
 func main() {
-
 	listener, tcpErr := net.Listen("tcp", ":9000")
 	if tcpErr != nil {
 		panic(tcpErr)
@@ -34,20 +32,20 @@ func main() {
 	}
 }
 
-func (s *server) ServerReply(strem proto.Example_ServerReplyServer) error {
-	total := 0 // total messages client
-	for {
-		request, err := strem.Recv()
-		if err == io.EOF {
-			return strem.SendAndClose(&proto.HelloResponse{
-				Reply: strconv.Itoa(total),
-			})
-		}
+func (s *server) ServerReply(req *proto.HelloRequest, strem proto.Example_ServerReplyServer) error {
+	fmt.Println(req.SomeString)
+	time.Sleep(5 * time.Second)
+	girlReply := []*proto.HelloResponse{
+		{Reply: "Kya hua"},
+		{Reply: "Sorry"},
+		{Reply: "Man jao na"},
+		{Reply: "Please"},
+	}
+	for _, msg := range girlReply {
+		err := strem.Send(msg)
 		if err != nil {
 			return err
 		}
-
-		total++
-		fmt.Println(request)
 	}
+	return nil
 }

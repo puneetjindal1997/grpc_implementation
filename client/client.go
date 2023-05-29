@@ -2,13 +2,15 @@ package main
 
 // Welcome to channel go guruji
 
-// Topic grpc client streaming
+// Topic grpc server streaming
 
 import (
 	"context"
 	"fmt"
 	proto "grpc/protoc"
+	"io"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc"
@@ -32,36 +34,22 @@ func main() {
 }
 
 func clientConnectionServer(c *gin.Context) {
-
-	req := []*proto.HelloRequest{
-		{SomeString: "Request 1"},
-		{SomeString: "Request 2"},
-		{SomeString: "Request 3"},
-		{SomeString: "Request 4"},
-		{SomeString: "Request 5"},
-		{SomeString: "Request 6"},
-	}
-
-	stream, err := client.ServerReply(context.TODO())
+	stream, err := client.ServerReply(context.TODO(), &proto.HelloRequest{SomeString: "m rutha hua hu"})
 	if err != nil {
 		fmt.Println("Something error")
 		return
 	}
-	for _, re := range req {
-		err = stream.Send(re)
-		if err != nil {
-			fmt.Println("request not fulfil")
-			return
+	count := 0
+	for {
+		message, err := stream.Recv()
+		if err == io.EOF {
+			break
 		}
-
-	}
-	response, err := stream.CloseAndRecv()
-	if err != nil {
-		fmt.Println("there is some error occure ", err)
-		return
+		fmt.Println("girlfriend messages:- ", message)
+		time.Sleep(1 * time.Second)
+		count++
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"message_count": response,
+		"message_count": count,
 	})
-
 }
