@@ -26,7 +26,7 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ExampleClient interface {
-	ServerReply(ctx context.Context, in *HelloRequest, opts ...grpc.CallOption) (*HelloResponse, error)
+	ServerReply(ctx context.Context, opts ...grpc.CallOption) (Example_ServerReplyClient, error)
 }
 
 type exampleClient struct {
@@ -37,20 +37,45 @@ func NewExampleClient(cc grpc.ClientConnInterface) ExampleClient {
 	return &exampleClient{cc}
 }
 
-func (c *exampleClient) ServerReply(ctx context.Context, in *HelloRequest, opts ...grpc.CallOption) (*HelloResponse, error) {
-	out := new(HelloResponse)
-	err := c.cc.Invoke(ctx, Example_ServerReply_FullMethodName, in, out, opts...)
+func (c *exampleClient) ServerReply(ctx context.Context, opts ...grpc.CallOption) (Example_ServerReplyClient, error) {
+	stream, err := c.cc.NewStream(ctx, &Example_ServiceDesc.Streams[0], Example_ServerReply_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
-	return out, nil
+	x := &exampleServerReplyClient{stream}
+	return x, nil
+}
+
+type Example_ServerReplyClient interface {
+	Send(*HelloRequest) error
+	CloseAndRecv() (*HelloResponse, error)
+	grpc.ClientStream
+}
+
+type exampleServerReplyClient struct {
+	grpc.ClientStream
+}
+
+func (x *exampleServerReplyClient) Send(m *HelloRequest) error {
+	return x.ClientStream.SendMsg(m)
+}
+
+func (x *exampleServerReplyClient) CloseAndRecv() (*HelloResponse, error) {
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	m := new(HelloResponse)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
 }
 
 // ExampleServer is the server API for Example service.
 // All implementations must embed UnimplementedExampleServer
 // for forward compatibility
 type ExampleServer interface {
-	ServerReply(context.Context, *HelloRequest) (*HelloResponse, error)
+	ServerReply(Example_ServerReplyServer) error
 	mustEmbedUnimplementedExampleServer()
 }
 
@@ -58,8 +83,8 @@ type ExampleServer interface {
 type UnimplementedExampleServer struct {
 }
 
-func (UnimplementedExampleServer) ServerReply(context.Context, *HelloRequest) (*HelloResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ServerReply not implemented")
+func (UnimplementedExampleServer) ServerReply(Example_ServerReplyServer) error {
+	return status.Errorf(codes.Unimplemented, "method ServerReply not implemented")
 }
 func (UnimplementedExampleServer) mustEmbedUnimplementedExampleServer() {}
 
@@ -74,22 +99,30 @@ func RegisterExampleServer(s grpc.ServiceRegistrar, srv ExampleServer) {
 	s.RegisterService(&Example_ServiceDesc, srv)
 }
 
-func _Example_ServerReply_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(HelloRequest)
-	if err := dec(in); err != nil {
+func _Example_ServerReply_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(ExampleServer).ServerReply(&exampleServerReplyServer{stream})
+}
+
+type Example_ServerReplyServer interface {
+	SendAndClose(*HelloResponse) error
+	Recv() (*HelloRequest, error)
+	grpc.ServerStream
+}
+
+type exampleServerReplyServer struct {
+	grpc.ServerStream
+}
+
+func (x *exampleServerReplyServer) SendAndClose(m *HelloResponse) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func (x *exampleServerReplyServer) Recv() (*HelloRequest, error) {
+	m := new(HelloRequest)
+	if err := x.ServerStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
-	if interceptor == nil {
-		return srv.(ExampleServer).ServerReply(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Example_ServerReply_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ExampleServer).ServerReply(ctx, req.(*HelloRequest))
-	}
-	return interceptor(ctx, in, info, handler)
+	return m, nil
 }
 
 // Example_ServiceDesc is the grpc.ServiceDesc for Example service.
@@ -98,12 +131,13 @@ func _Example_ServerReply_Handler(srv interface{}, ctx context.Context, dec func
 var Example_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "Example",
 	HandlerType: (*ExampleServer)(nil),
-	Methods: []grpc.MethodDesc{
+	Methods:     []grpc.MethodDesc{},
+	Streams: []grpc.StreamDesc{
 		{
-			MethodName: "ServerReply",
-			Handler:    _Example_ServerReply_Handler,
+			StreamName:    "ServerReply",
+			Handler:       _Example_ServerReply_Handler,
+			ClientStreams: true,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
 	Metadata: "Hello.proto",
 }
